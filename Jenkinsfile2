@@ -1,0 +1,66 @@
+pipeline {
+    agent any
+    tools{
+        maven "maven"
+    }
+    
+    environment {
+        // Replace with your Docker Hub credentials ID and repository name
+        DOCKER_CREDENTIALS_ID = 'dockerlogin'
+        DOCKER_REPO = 'tech365/uploaded-artefact'
+        // MAVEN_HOME = tool 'Maven 3.8.5'
+        // Set the Java home if required
+
+
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                // Checkout the code from your repository
+                git 'https://github.com/waleolajumoke/springapp'
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    // Building the Docker image with a specific tag
+                    def image = docker.build("${DOCKER_REPO}:${env.BUILD_NUMBER}")
+                }
+            }
+        }
+        
+        stage('Login to Docker Hub') {
+            steps {
+                script {
+                    // Log in to Docker Hub using credentials
+                    docker.withRegistry('', "${DOCKER_CREDENTIALS_ID}") {
+                        echo 'Logged in to Docker Hub'
+                    }
+                }
+            }
+        }
+        
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                script {
+                    docker.withRegistry('', "${DOCKER_CREDENTIALS_ID}") {
+                        // Push the Docker image
+                        def image = docker.image("${DOCKER_REPO}:${env.BUILD_NUMBER}")
+                        image.push()
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                // Clean up the Docker images from the Jenkins agent to save space
+                sh "docker rmi ${DOCKER_REPO}:${env.BUILD_NUMBER}"
+            }
+        }
+    }
+}
